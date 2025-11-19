@@ -1,0 +1,1528 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Siraw | Premium Profile</title>
+
+<!-- Use modern Firebase SDKs --><script type="module">
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+
+import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+import { getFirestore, doc, getDoc, updateDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+
+// Use Firestore for persistent data storage
+
+setLogLevel('Debug');
+
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+
+const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+
+
+let app;
+
+let db;
+
+let auth;
+
+let isAuthReady = false;
+
+
+
+// Initialize Firebase and Authentication
+
+try {
+
+app = initializeApp(firebaseConfig);
+
+db = getFirestore(app);
+
+auth = getAuth(app);
+
+
+// Sign in using the custom token or anonymously
+
+onAuthStateChanged(auth, async (user) => {
+
+if (user) {
+
+console.log("Authenticated user:", user.uid);
+
+isAuthReady = true;
+
+// Run the main logic after authentication is ready
+
+trackPageView();
+
+displayViewCount();
+
+} else if (initialAuthToken) {
+
+await signInWithCustomToken(auth, initialAuthToken);
+
+} else {
+
+await signInAnonymously(auth);
+
+}
+
+});
+
+} catch (error) {
+
+console.error("Firebase Initialization or Auth Error:", error);
+
+}
+
+
+
+// --- View Counter Logic (Firestore Implementation) ---
+
+
+// Document path for the public view count (shared across all users)
+
+const getCountDocRef = () => doc(db, 'artifacts', appId, 'public', 'data', 'viewCounts', 'profile');
+
+
+
+// Generate a unique visitor ID stored in localStorage
+
+function getUniqueVisitorId() {
+
+let visitorId = localStorage.getItem('siraw_unique_visitor_id');
+
+if (!visitorId) {
+
+// Generate a new ID if none exists (new unique browser/device)
+
+visitorId = 'visitor_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+
+localStorage.setItem('siraw_unique_visitor_id', visitorId);
+
+}
+
+return visitorId;
+
+}
+
+
+
+// Track page view (only once per unique visitor based on localStorage ID)
+
+async function trackPageView() {
+
+if (!isAuthReady) {
+
+console.log("Firebase not ready for view tracking.");
+
+return;
+
+}
+
+
+
+const visitorId = getUniqueVisitorId();
+
+// Store visitor records in a subcollection under public data
+
+const visitorsRef = doc(db, 'artifacts', appId, 'public', 'data', 'uniqueVisitors', visitorId);
+
+
+
+try {
+
+const visitorSnap = await getDoc(visitorsRef);
+
+
+
+if (!visitorSnap.exists()) {
+
+// This is a new unique visitor, increment global count and record visitor
+
+const countDocRef = getCountDocRef();
+
+const countSnap = await getDoc(countDocRef);
+
+const currentCount = countSnap.exists() ? countSnap.data().count : 0;
+
+
+
+// Atomically update the main count
+
+await setDoc(countDocRef, {
+
+count: currentCount + 1,
+
+lastUpdate: new Date()
+
+}, { merge: true });
+
+
+
+// Record the unique visitor so they aren't counted again
+
+await setDoc(visitorsRef, {
+
+firstVisit: new Date(),
+
+userAgent: navigator.userAgent
+
+});
+
+
+console.log("Unique view count incremented for new visitor:", visitorId);
+
+} else {
+
+console.log("Existing visitor, not incrementing unique count:", visitorId);
+
+}
+
+} catch (error) {
+
+console.error("Error tracking view:", error);
+
+}
+
+}
+
+
+
+// Display view count using a real-time listener (onSnapshot)
+
+function displayViewCount() {
+
+if (!isAuthReady) return;
+
+
+const docRef = getCountDocRef();
+
+
+onSnapshot(docRef, (doc) => {
+
+if (doc.exists()) {
+
+const count = doc.data().count || 0;
+
+const viewCountElement = document.getElementById('viewCount');
+
+viewCountElement.textContent = count.toLocaleString();
+
+
+// Add pulse animation when count updates
+
+viewCountElement.classList.add('pulse');
+
+setTimeout(() => {
+
+viewCountElement.classList.remove('pulse');
+
+}, 500);
+
+} else {
+
+document.getElementById('viewCount').textContent = '0';
+
+}
+
+}, (error) => {
+
+console.error("Error listening to view count:", error);
+
+});
+
+}
+
+
+// Fallback if background video doesn't load
+
+document.addEventListener('DOMContentLoaded', function() {
+
+// The onAuthStateChanged listener handles calling trackPageView and displayViewCount
+
+
+const video = document.getElementById('background-video');
+
+video.addEventListener('error', function() {
+
+document.body.style.background = 'linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 50%, #0a0a0a 100%)';
+
+});
+
+});
+
+
+
+</script>
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<style>
+
+/* General Reset and Base Styles */
+
+* {
+
+margin: 0;
+
+padding: 0;
+
+box-sizing: border-box;
+
+font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+
+}
+
+
+
+body {
+
+background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 50%, #0a0a0a 100%);
+
+color: #fff;
+
+overflow-x: hidden;
+
+min-height: 100vh;
+
+position: relative;
+
+}
+
+
+
+#background-video {
+
+position: fixed;
+
+top: 0;
+
+left: 0;
+
+width: 100%;
+
+height: 100%;
+
+object-fit: cover;
+
+z-index: -2;
+
+opacity: 1.4;
+
+}
+
+
+
+.overlay {
+
+position: fixed;
+
+top: 0;
+
+left: 0;
+
+width: 100%;
+
+height: 100%;
+
+background: linear-gradient(135deg, rgba(10, 10, 10, 0.9) 0%, rgba(26, 26, 26, 0.8) 100%);
+
+z-index: -1;
+
+}
+
+
+
+.container {
+
+max-width: 800px;
+
+margin: 0 auto;
+
+padding: 2rem;
+
+display: flex;
+
+flex-direction: column;
+
+align-items: center;
+
+min-height: 100vh;
+
+}
+
+
+
+/* Profile Header Styles */
+
+.profile-header {
+
+text-align: center;
+
+margin-bottom: 2rem;
+
+width: 100%;
+
+display: flex;
+
+flex-direction: column;
+
+align-items: center;
+
+margin-top: 3rem; /* Pushes the header down */
+
+}
+
+
+
+.profile-image {
+
+width: 180px;
+
+height: 180px;
+
+border-radius: 50%;
+
+object-fit: cover;
+
+border: 4px solid #555;
+
+box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+
+margin-bottom: 1.5rem;
+
+transition: transform 0.3s ease;
+
+}
+
+
+
+.profile-image:hover {
+
+transform: scale(1.05);
+
+box-shadow: 0 0 25px rgba(255, 255, 255, 0.2);
+
+}
+
+
+
+.profile-name {
+
+font-size: 3.5rem;
+
+font-weight: 700;
+
+margin-bottom: 0.5rem;
+
+background: linear-gradient(90deg, #aaa, #fff, #aaa);
+
+-webkit-background-clip: text;
+
+background-clip: text;
+
+color: transparent;
+
+text-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+
+position: relative;
+
+display: inline-block;
+
+}
+
+
+
+.profile-name::after {
+
+content: '';
+
+position: absolute;
+
+bottom: -5px;
+
+left: 0;
+
+width: 100%;
+
+height: 2px;
+
+background: linear-gradient(90deg, transparent, #aaa, transparent);
+
+border-radius: 2px;
+
+}
+
+
+
+.profile-tagline {
+
+font-size: 1.2rem;
+
+color: #aaa;
+
+margin-bottom: 1.5rem;
+
+}
+
+
+
+/* Eye Counter */
+
+.eye-counter {
+
+position: fixed;
+
+top: 20px;
+
+left: 20px;
+
+display: flex;
+
+align-items: center;
+
+gap: 8px;
+
+background: rgba(30, 30, 30, 0.8);
+
+padding: 8px 12px;
+
+border-radius: 20px;
+
+backdrop-filter: blur(10px);
+
+border: 1px solid rgba(170, 170, 170, 0.3);
+
+box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+
+z-index: 100;
+
+}
+
+
+
+.eye-container {
+
+display: flex;
+
+justify-content: center;
+
+align-items: center;
+
+}
+
+
+
+.stylized-eye {
+
+width: 20px;
+
+height: 12px;
+
+background: linear-gradient(135deg, #777, #aaa);
+
+border-radius: 50%;
+
+position: relative;
+
+box-shadow: 0 0 10px rgba(170, 170, 170, 0.3);
+
+display: flex;
+
+justify-content: center;
+
+align-items: center;
+
+overflow: hidden;
+
+}
+
+
+
+.eye-pupil {
+
+width: 8px;
+
+height: 8px;
+
+background: #000;
+
+border-radius: 50%;
+
+position: relative;
+
+z-index: 2;
+
+}
+
+
+
+.eye-sparkle {
+
+width: 2px;
+
+height: 2px;
+
+background: #fff;
+
+border-radius: 50%;
+
+position: absolute;
+
+top: 2px;
+
+right: 3px;
+
+z-index: 3;
+
+}
+
+
+
+.view-count {
+
+font-weight: 600;
+
+font-size: 0.9rem;
+
+color: #aaa;
+
+}
+
+
+
+/* Social Icons (Top Bar) */
+
+.social-icons {
+
+display: flex;
+
+justify-content: center;
+
+gap: 1.5rem;
+
+margin-bottom: 2.5rem;
+
+}
+
+
+
+.social-icons a {
+
+font-size: 1.8rem;
+
+transition: all 0.3s ease;
+
+width: 50px;
+
+height: 50px;
+
+display: flex;
+
+align-items: center;
+
+justify-content: center;
+
+border-radius: 50%;
+
+background: rgba(30, 30, 30, 0.8);
+
+backdrop-filter: blur(10px);
+
+border: 1px solid rgba(170, 170, 170, 0.2);
+
+text-shadow: 0 0 10px currentColor;
+
+}
+
+
+
+.social-icons a:nth-child(1) {
+
+color: #ffffff; /* TikTok is white */
+
+}
+
+
+
+.social-icons a:nth-child(2) {
+
+color: #ff0000; /* YouTube is red */
+
+}
+
+
+.social-icons a:nth-child(3) {
+
+color: #FFFC00; /* Snapchat is yellow */
+
+text-shadow: 0 0 10px rgba(255, 255, 0, 0.5); /* Added glow for Snapchat */
+
+}
+
+
+
+
+
+.social-icons a:hover {
+
+transform: translateY(-5px);
+
+box-shadow: 0 5px 15px rgba(255, 255, 255, 0.2);
+
+}
+
+
+
+/* Call to Action before social links */
+
+.profile-cta {
+
+font-size: 1.5rem;
+
+font-weight: 600;
+
+color: #fff;
+
+margin-bottom: 2rem;
+
+text-align: center;
+
+/* Plain text styling */
+
+padding: 0;
+
+background: none;
+
+backdrop-filter: none;
+
+border: none;
+
+border-radius: 0;
+
+}
+
+
+
+/* Social Link Cards Section */
+
+.social-links {
+
+display: flex;
+
+flex-direction: column;
+
+gap: 1.5rem;
+
+width: 100%;
+
+margin-bottom: 3rem;
+
+}
+
+
+
+.social-card {
+
+background: rgba(30, 30, 30, 0.8);
+
+border-radius: 65px;
+
+padding: 1.5rem;
+
+display: flex;
+
+align-items: center;
+
+justify-content: space-between;
+
+gap: 1rem;
+
+text-decoration: none;
+
+color: #fff;
+
+transition: all 0.3s ease;
+
+backdrop-filter: blur(10px);
+
+border: 2px solid rgba(255, 255, 255, 0.2);
+
+box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+
+}
+
+
+
+.social-card:hover {
+
+transform: translateY(-5px);
+
+box-shadow: 0 10px 25px rgba(255, 255, 255, 0.1);
+
+border-color: rgba(170, 170, 170, 0.5);
+
+}
+
+
+
+.social-icon {
+
+width: 50px;
+
+height: 50px;
+
+border-radius: 10px;
+
+display: flex;
+
+align-items: center;
+
+justify-content: center;
+
+font-size: 1.5rem;
+
+box-shadow: 0 0 15px rgba(255, 255, 255, 0.1);
+
+flex-shrink: 0;
+
+object-fit: cover; /* Ensure custom images fit well */
+
+}
+
+
+
+/* Specific WhatsApp Icon Styling */
+
+.social-card.whatsapp-card .social-icon {
+
+background: #25D366; /* WhatsApp Green */
+
+color: white;
+
+padding: 0; /* Remove default padding for image */
+
+font-size: initial; /* Reset font-size if using image */
+
+}
+
+.social-card.whatsapp-card .social-icon img {
+
+width: 100%;
+
+height: 100%;
+
+border-radius: 10px;
+
+object-fit: cover;
+
+}
+
+
+/* Options (three dots) */
+
+.social-options {
+
+color: #888;
+
+font-size: 1.2rem;
+
+flex-shrink: 0;
+
+width: 20px;
+
+text-align: right;
+
+transition: color 0.3s ease;
+
+}
+
+
+.social-card:hover .social-options {
+
+color: #fff;
+
+}
+
+
+
+/* Link Card Colors (Updated for new order: YouTube, Discord, Snapchat, Instagram, WhatsApp) */
+
+.social-card:nth-child(1) .social-icon { /* YouTube is 1st card */
+
+background: #ff0000;
+
+color: white;
+
+}
+
+
+
+.social-card:nth-child(2) .social-icon { /* Discord is 2nd card */
+
+background: #5865F2; /* Discord Blue */
+
+color: white;
+
+}
+
+
+
+.social-card:nth-child(3) .social-icon { /* Snapchat is 3rd card */
+
+background: #FFFC00; /* Snapchat Yellow */
+
+color: #000;
+
+}
+
+
+
+.social-card:nth-child(4) .social-icon { /* Instagram is 4th card */
+
+background: linear-gradient(135deg, #833AB4, #C13584, #E1306C, #FD1D1D); /* Instagram Gradient */
+
+color: white;
+
+}
+
+/* The WhatsApp card uses the specific class .whatsapp-card for its color. */
+
+
+
+
+
+/* Social Info (Text Block) */
+
+.social-info {
+
+text-align: center;
+
+flex-grow: 1;
+
+display: flex;
+
+flex-direction: column;
+
+justify-content: center;
+
+}
+
+
+
+.social-info h3 {
+
+font-size: 1.2rem;
+
+margin-bottom: 0.3rem;
+
+text-transform: capitalize;
+
+text-align: center;
+
+width: 100%;
+
+}
+
+
+
+.social-info p {
+
+color: #aaa;
+
+font-size: 0.9rem;
+
+text-align: center;
+
+width: 100%;
+
+}
+
+
+
+/* Footer */
+
+.footer {
+
+margin-top: auto;
+
+text-align: center;
+
+padding: 2rem 0;
+
+width: 100%;
+
+}
+
+
+
+.made-by {
+
+color: #aaa;
+
+margin-bottom: 1rem;
+
+font-size: 1.1rem;
+
+}
+
+
+
+.made-by a {
+
+color: #aaa;
+
+text-decoration: none;
+
+transition: all 0.3s ease;
+
+}
+
+
+
+.made-by a:hover {
+
+color: #fff;
+
+}
+
+
+
+.contact-dev {
+
+color: #888;
+
+font-size: 0.9rem;
+
+margin-bottom: 1rem;
+
+}
+
+
+
+.contact-dev a {
+
+color: #aaa;
+
+text-decoration: none;
+
+transition: all 0.3s ease;
+
+}
+
+
+
+.contact-dev a:hover {
+
+color: #fff;
+
+}
+
+
+
+/* Glow effects */
+
+.glow {
+
+position: absolute;
+
+border-radius: 50%;
+
+filter: blur(80px);
+
+opacity: 0.1;
+
+z-index: -1;
+
+}
+
+
+
+.glow-1 {
+
+width: 300px;
+
+height: 300px;
+
+background: #555;
+
+top: 10%;
+
+left: 10%;
+
+}
+
+
+
+.glow-2 {
+
+width: 400px;
+
+height: 400px;
+
+background: #333;
+
+bottom: 10%;
+
+right: 10%;
+
+}
+
+
+
+.glow-3 {
+
+width: 200px;
+
+height: 200px;
+
+background: #777;
+
+top: 50%;
+
+left: 50%;
+
+transform: translate(-50%, -50%);
+
+}
+
+
+
+/* Responsive adjustments */
+
+@media (max-width: 768px) {
+
+.container {
+
+padding: 1.5rem;
+
+}
+
+
+.profile-name {
+
+font-size: 2.5rem;
+
+}
+
+
+.profile-image {
+
+width: 150px;
+
+height: 150px;
+
+}
+
+
+.social-icons {
+
+gap: 1rem;
+
+}
+
+
+.social-icons a {
+
+font-size: 1.5rem;
+
+width: 45px;
+
+height: 45px;
+
+}
+
+
+
+.eye-counter {
+
+top: 15px;
+
+left: 15px;
+
+padding: 6px 10px;
+
+}
+
+
+.social-card {
+
+padding: 1.2rem;
+
+border-radius: 50px;
+
+flex-direction: row;
+
+text-align: left;
+
+justify-content: space-between;
+
+}
+
+
+.social-icon {
+
+width: 45px;
+
+height: 45px;
+
+font-size: 1.3rem;
+
+}
+
+}
+
+
+@media (max-width: 480px) {
+
+.container {
+
+padding: 1rem;
+
+}
+
+
+.profile-name {
+
+font-size: 2rem;
+
+}
+
+
+.profile-image {
+
+width: 130px;
+
+height: 130px;
+
+}
+
+
+.profile-tagline {
+
+font-size: 1rem;
+
+}
+
+
+.social-icons a {
+
+width: 40px;
+
+height: 40px;
+
+font-size: 1.3rem;
+
+}
+
+
+.social-card {
+
+padding: 1rem;
+
+border-radius: 40px;
+
+flex-direction: column;
+
+text-align: center;
+
+gap: 0.8rem;
+
+justify-content: center;
+
+}
+
+
+.social-options {
+
+display: none;
+
+}
+
+
+.social-icon {
+
+width: 40px;
+
+height: 40px;
+
+font-size: 1.3rem;
+
+}
+
+
+.social-info h3 {
+
+font-size: 1.1rem;
+
+}
+
+
+.social-info p {
+
+font-size: 0.85rem;
+
+}
+
+
+
+.profile-cta {
+
+font-size: 1.2rem;
+
+}
+
+}
+
+
+
+/* Animation for the view counter */
+
+@keyframes pulse {
+
+0% { transform: scale(1); }
+
+50% { transform: scale(1.1); }
+
+100% { transform: scale(1); }
+
+}
+
+
+
+.pulse {
+
+animation: pulse 0.5s ease;
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+<!-- Background Video --><video id="background-video" autoplay muted loop>
+
+<source src="images/background.mp4" type="video/mp4">
+
+Your browser does not support the video tag.
+
+</video>
+
+
+<!-- Glow effects --><div class="glow glow-1"></div>
+
+<div class="glow glow-2"></div>
+
+<div class="glow glow-3"></div>
+
+
+<!-- Overlay for better text readability --><div class="overlay"></div>
+
+
+
+<!-- Compact Eye Counter in Top Left Corner --><div class="eye-counter">
+
+<div class="eye-container">
+
+<div class="stylized-eye">
+
+<div class="eye-pupil"></div>
+
+<div class="eye-sparkle"></div>
+
+</div>
+
+</div>
+
+<div class="view-count" id="viewCount">0</div>
+
+</div>
+
+
+<!-- Main Content --><div class="container">
+
+<div class="profile-header">
+
+<img src="images/pfp.jpg" onerror="this.onerror=null; this.src='https://placehold.co/180x180/444444/FFFFFF?text=Siraw+PFP'" alt="Siraw Profile" class="profile-image">
+
+<h1 class="profile-name">siraw</h1>
+
+<p class="profile-tagline">siraw a.k.a waris</p>
+
+</div>
+
+
+<!-- Social Media Icons (Top Bar) --><div class="social-icons">
+
+<a href="https://www.tiktok.com/@siraw._?_r=1&_t=ZT-91Wa264mQCz" target="_blank">
+
+<i class="fab fa-tiktok"></i>
+
+</a>
+
+<a href="https://youtube.com/@siraw_edit?si=07fUM1T9E32G36PY" target="_blank">
+
+<i class="fab fa-youtube"></i>
+
+</a>
+
+<!-- New Snapchat Link Added -->
+
+<a href="https://snapchat.com/t/SGPDe1Rk" target="_blank">
+
+<i class="fab fa-snapchat"></i>
+
+</a>
+
+</div>
+
+
+<!-- DM and Get an Edit CTA (Now plain text) --><div class="profile-cta">
+
+DM AND GET AN EDIT BELOW!
+
+</div>
+
+
+
+<div class="social-links">
+
+<!-- YouTube Card (Now 1st) --><a href="https://youtube.com/@siraw_edit?si=07fUM1T9E32G36PY" class="social-card" target="_blank">
+
+<div class="social-icon">
+
+<i class="fab fa-youtube"></i>
+
+</div>
+
+<div class="social-info">
+
+<h3>YouTube</h3>
+
+<p>Support my Channel</p>
+
+</div>
+
+<div class="social-options"><i class="fas fa-ellipsis-v"></i></div>
+
+</a>
+
+
+<!-- Discord Card (Now 2nd) --><a href="https://discord.gg/hQegert8" class="social-card" target="_blank">
+
+<div class="social-icon">
+
+<i class="fab fa-discord"></i>
+
+</div>
+
+<div class="social-info">
+
+<h3>Discord</h3>
+
+<p>DM for paid edits</p>
+
+</div>
+
+<div class="social-options"><i class="fas fa-ellipsis-v"></i></div>
+
+</a>
+
+
+<!-- Snapchat Card (Now 3rd) --><a href="https://snapchat.com/t/Obou4lAc" class="social-card" target="_blank">
+
+<div class="social-icon">
+
+<i class="fab fa-snapchat"></i>
+
+</div>
+
+<div class="social-info">
+
+<h3>Snapchat</h3>
+
+<p>DM for paid edits</p>
+
+</div>
+
+<div class="social-options"><i class="fas fa-ellipsis-v"></i></div>
+
+</a>
+
+
+
+<!-- Instagram Card (Now 4th) --><a href="https://www.instagram.com/siraw._?igsh=cXo3ZTQ4dno1YW1i&utm_source=qr" class="social-card" target="_blank">
+
+<div class="social-icon">
+
+<i class="fab fa-instagram"></i>
+
+</div>
+
+<div class="social-info">
+
+<h3>Instagram</h3>
+
+<p>Stay updated</p>
+
+</div>
+
+<div class="social-options"><i class="fas fa-ellipsis-v"></i></div>
+
+</a>
+
+
+<!-- WhatsApp Group Card (Moved to the bottom - Now 5th) --><a href="https://chat.whatsapp.com/HfIjTFyCLBbHVwRJhGw7Kc" class="social-card whatsapp-card" target="_blank">
+
+<div class="social-icon">
+
+<!-- Replace 'images/whatsapp_pfp.jpg' with your actual image path --><img src="images/pfp.jpg" onerror="this.onerror=null; this.src='https://placehold.co/50x50/25D366/FFFFFF?text=WA'" alt="WhatsApp Group">
+
+</div>
+
+<div class="social-info">
+
+<h3>NODNARB'S WHATSAPP GC</h3>
+
+<p>WhatsApp Community • Free to join</p>
+
+</div>
+
+<div class="social-options"><i class="fas fa-ellipsis-v"></i></div>
+
+</a>
+
+</div>
+
+
+<div class="footer">
+
+<p class="made-by">MADE BY <a href="https://www.tiktok.com/@moonlight_kunn?_r=1&_t=ZT-91SbXXNovSB">MOONLIGHT</a></p>
+
+<p class="contact-dev">Contact dev if you want a link page like this: <a href="https://t.me/ECLIPSIATECHS_BOT">Telegram</a></p>
+
+</div>
+
+</div>
+
+</body>
+
+</html>
